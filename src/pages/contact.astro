@@ -1,0 +1,145 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+import { safeHtml } from '../lib/sanitize';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let faqs: any[] = [];
+if (sb) {
+  const { data } = await sb.from('faqs').select('question, answer_html').eq('page_slug', 'faq').order('sort_order');
+  faqs = data ?? [];
+}
+
+const renderedAt = Date.now();
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Contact', item: `${siteUrl}/contact` },
+    ],
+  },
+  faqs.length > 0 && {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer_html.replace(/<[^>]+>/g, '') },
+    })),
+  },
+].filter(Boolean) as object[];
+---
+
+<Base
+  title="Contact Us | Core & Balance Pilates Studio Austin"
+  description="Questions about classes, private sessions, or your first visit? Contact Core & Balance Pilates Studio in Austin — we reply within one business day."
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-16 pb-20 lg:pt-24 grid gap-14 lg:grid-cols-[1fr_400px]">
+    <div>
+      <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">Contact</p>
+      <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink">Ask us anything</h1>
+      <p class="mt-5 max-w-xl text-muted leading-relaxed">
+        Wondering which class fits your body, whether prenatal is right for your trimester, or how private sessions work? Send a note — a real person replies within one business day. In a hurry? Most answers are on the <a href="/classes" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">classes page</a> or the <a href="/schedule" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">schedule</a>.
+      </p>
+
+      <form id="contact-form" method="POST" action="/api/contact" class="mt-9 max-w-xl space-y-5">
+        <input type="hidden" name="renderedAt" value={renderedAt} />
+        <input type="text" name="website" aria-hidden="true" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0;pointer-events:none" />
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label for="name" class="block text-sm font-medium text-ink">Name</label>
+            <input id="name" type="text" name="name" required class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage" placeholder="Jordan Smith" />
+          </div>
+          <div>
+            <label for="email" class="block text-sm font-medium text-ink">Email</label>
+            <input id="email" type="email" name="email" required class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage" placeholder="you@example.com" />
+          </div>
+        </div>
+        <div>
+          <label for="message" class="block text-sm font-medium text-ink">Message</label>
+          <textarea id="message" name="message" rows="5" required minlength="10" class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage" placeholder="Tell us what you're looking for…"></textarea>
+        </div>
+        <div class="flex items-center gap-5">
+          <button type="submit" id="send-btn" class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5 disabled:opacity-60">Send message</button>
+          <p id="form-status" class="text-sm text-muted" role="status"></p>
+        </div>
+      </form>
+    </div>
+
+    <aside class="space-y-6">
+      <div class="rounded-lg border border-line bg-cream p-6 text-sm leading-relaxed">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-muted">Visit us</p>
+        <address class="mt-2 not-italic text-ink">
+          Core &amp; Balance Pilates Studio<br />
+          2114 South Lamar Blvd, Suite 210<br />
+          Austin, TX 78704
+        </address>
+        <p class="mt-3"><a href="https://www.google.com/maps/search/?api=1&query=2114+South+Lamar+Blvd+Austin+TX+78704" target="_blank" rel="noopener" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">Open in Google Maps</a></p>
+      </div>
+      <div class="rounded-lg border border-line bg-cream p-6 text-sm leading-relaxed">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-muted">Reach us</p>
+        <p class="mt-2"><a href="tel:+15125550184" class="text-ink hover:text-sage">(512) 555-0184</a></p>
+        <p><a href="mailto:hello@coreandbalanceatx.com" class="text-ink hover:text-sage">hello@coreandbalanceatx.com</a></p>
+        <p class="mt-3 text-muted">Mon–Fri 6am–8pm<br />Sat–Sun 8am–2pm</p>
+      </div>
+      <div class="rounded-lg border border-line p-6 text-sm">
+        <p class="font-display text-lg text-ink">Ready to just book?</p>
+        <p class="mt-2 text-muted leading-relaxed">Skip the inbox — the <a href="/schedule" class="text-sage underline decoration-line underline-offset-4">full schedule</a> is bookable online.</p>
+        <a href="/book" class="mt-4 inline-flex items-center rounded-full bg-sage px-6 py-2.5 text-sm font-medium text-paper hover:bg-sage-dark transition-colors">Book a class</a>
+      </div>
+    </aside>
+  </section>
+
+  {faqs.length > 0 && (
+    <section class="border-t border-line bg-cream">
+      <div class="mx-auto max-w-3xl px-6 py-16 lg:py-20">
+        <h2 class="font-display text-3xl tracking-tight text-ink">Before you write — quick answers</h2>
+        <div class="mt-8 divide-y divide-line">
+          {faqs.map((f) => (
+            <details class="group py-5">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-ink">
+                {f.question}
+                <span class="text-sage transition-transform group-open:rotate-45 text-xl leading-none shrink-0">+</span>
+              </summary>
+              <div class="mt-3 text-sm leading-relaxed text-muted [&_p]:mb-2" set:html={safeHtml(f.answer_html)} />
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <script>
+    const form = document.getElementById('contact-form') as HTMLFormElement | null;
+    const status = document.getElementById('form-status');
+    const btn = document.getElementById('send-btn') as HTMLButtonElement | null;
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      if (btn) btn.disabled = true;
+      if (status) status.textContent = 'Sending…';
+      try {
+        const body = Object.fromEntries(new FormData(form).entries());
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? 'Something went wrong');
+        if (status) status.textContent = 'Got it — we\'ll reply within one business day.';
+        form.reset();
+      } catch (err: any) {
+        if (status) status.textContent = err.message;
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    });
+  </script>
+</Base>

@@ -1,0 +1,112 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let classes: any[] = [];
+if (sb) {
+  const { data } = await sb
+    .from('classes')
+    .select('slug, name, short_description, level, duration_minutes, price_cents, capacity')
+    .not('published_at', 'is', null)
+    .order('sort_order');
+  classes = data ?? [];
+}
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Pricing', item: `${siteUrl}/pricing` },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: classes.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Offer',
+        name: c.name,
+        price: (c.price_cents / 100).toFixed(2),
+        priceCurrency: 'USD',
+        url: `${siteUrl}/classes/${c.slug}`,
+      },
+    })),
+  },
+];
+---
+
+<Base
+  title="Pilates Class Pricing Austin | Core & Balance Studio"
+  description="Simple per-class pricing for reformer, mat, prenatal, and barre fusion pilates in Austin. No contracts, no joining fees — book online."
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-16 pb-12 lg:pt-24">
+    <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">Pricing</p>
+    <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink max-w-2xl">Pay per class. That's it.</h1>
+    <p class="mt-5 max-w-2xl text-muted leading-relaxed">
+      No joining fees, no contracts, no "talk to our membership advisor". Every pilates class at our Austin studio is priced per session and bookable online — you pay when you book, and cancelling 12+ hours ahead earns a full class credit. Compare formats on the <a href="/classes" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">classes page</a> or jump straight to the <a href="/schedule" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">schedule</a>.
+    </p>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-6 pb-16">
+    <div class="overflow-hidden rounded-lg border border-line">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-line bg-cream text-[11px] uppercase tracking-[0.16em] text-muted">
+            <th class="px-5 py-4 font-medium">Class</th>
+            <th class="px-5 py-4 font-medium hidden md:table-cell">Length</th>
+            <th class="px-5 py-4 font-medium hidden md:table-cell">Class size</th>
+            <th class="px-5 py-4 font-medium hidden sm:table-cell">Level</th>
+            <th class="px-5 py-4 font-medium">Price</th>
+            <th class="px-5 py-4"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-line">
+          {classes.map((c) => (
+            <tr class="transition-colors hover:bg-sage-light/40">
+              <td class="px-5 py-4">
+                <a href={`/classes/${c.slug}`} class="font-display text-base text-ink hover:text-sage">{c.name}</a>
+                <p class="mt-0.5 text-xs text-muted max-w-[280px] hidden lg:block">{c.short_description}</p>
+              </td>
+              <td class="px-5 py-4 text-muted hidden md:table-cell">{c.duration_minutes} min</td>
+              <td class="px-5 py-4 text-muted hidden md:table-cell">max {c.capacity}</td>
+              <td class="px-5 py-4 text-muted hidden sm:table-cell">{c.level}</td>
+              <td class="px-5 py-4 font-display text-lg text-ink">${(c.price_cents / 100).toFixed(0)}</td>
+              <td class="px-5 py-4 text-right">
+                <a href={`/book?class=${c.slug}`} class="inline-block rounded-full bg-sage px-5 py-2 text-xs font-medium text-paper hover:bg-sage-dark transition-colors whitespace-nowrap">Book</a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-6 pb-20 lg:pb-28">
+    <div class="grid gap-6 md:grid-cols-3">
+      <div class="rounded-lg border border-line bg-cream p-6">
+        <p class="font-display text-lg text-ink">First class jitters?</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Every All Levels class includes newcomer setup in the first ten minutes. Tell us it's your first visit in the booking notes and we'll take extra care of you.</p>
+      </div>
+      <div class="rounded-lg border border-line bg-cream p-6">
+        <p class="font-display text-lg text-ink">Cancellations</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Life happens. Cancel 12+ hours before class by email or phone and we'll credit you a make-up class — no questions, no fees.</p>
+      </div>
+      <div class="rounded-lg border border-line bg-cream p-6">
+        <p class="font-display text-lg text-ink">Coming often?</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">Ask at the front desk about multi-class packs and duet private sessions — or <a href="/contact" class="text-sage underline decoration-line underline-offset-4">send us a message</a> and we'll walk you through options.</p>
+      </div>
+    </div>
+    <div class="mt-14 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-t border-line pt-10">
+      <h2 class="font-display text-2xl sm:text-3xl tracking-tight text-ink">Try a class this week</h2>
+      <a href="/book" class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5 shrink-0">Book online</a>
+    </div>
+  </section>
+</Base>

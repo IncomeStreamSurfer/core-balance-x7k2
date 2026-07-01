@@ -1,0 +1,92 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+import { safeHtml } from '../lib/sanitize';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let page: any = null;
+let team: any[] = [];
+if (sb) {
+  const [p, t] = await Promise.all([
+    sb.from('pages')
+      .select('title, meta_title, meta_description, body_html, og_image_url')
+      .eq('slug', 'about')
+      .not('published_at', 'is', null)
+      .maybeSingle(),
+    sb.from('instructors').select('slug, name, role, image_url').not('published_at', 'is', null).order('sort_order'),
+  ]);
+  page = p.data;
+  team = t.data ?? [];
+}
+
+const fallbackBody = `
+<p>Core &amp; Balance opened on South Lamar with one conviction: pilates works best when classes are small enough for real coaching. Reformer classes cap at six. Mat and barre cap at twelve. Every instructor holds a comprehensive certification, and most bring a specialty — sports rehab, prenatal movement, post-surgery recovery.</p>
+<p>Members come to us for different reasons — a stubborn back, a marathon plan, a pregnancy, a posture that finally demanded attention — and stay because the work compounds. Strength you can feel in week three. Posture people comment on in month two.</p>
+<p>The studio itself is deliberately calm: natural light, cork floors, no mirrors-and-megaphone energy. You'll hear your instructor, not a playlist at full volume.</p>`;
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'About', item: `${siteUrl}/about` },
+    ],
+  },
+];
+---
+
+<Base
+  title={page?.meta_title || 'About Us | Core & Balance Pilates Studio Austin'}
+  description={page?.meta_description || 'The story behind Core & Balance — a boutique pilates studio on South Lamar in Austin, built around small classes and expert coaching.'}
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-16 pb-12 lg:pt-24 grid gap-12 lg:grid-cols-[1fr_420px] lg:items-start">
+    <div>
+      <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">About the studio</p>
+      <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink">Built for people, not throughput</h1>
+      <article class="prose-about mt-7 max-w-xl" set:html={safeHtml(page?.body_html || fallbackBody)} />
+      <div class="mt-8 flex flex-wrap gap-5">
+        <a href="/book" class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5">Book a class</a>
+        <a href="/instructors" class="text-[15px] font-medium text-ink underline decoration-line underline-offset-4 self-center hover:text-sage hover:decoration-sage">Meet the instructors</a>
+      </div>
+    </div>
+    <div class="space-y-6">
+      <div class="aspect-[4/5] overflow-hidden rounded-lg">
+        <img src="https://images.unsplash.com/photo-1575052814086-f385e2e2ad1b?auto=format&fit=crop&w=1000&q=80" alt="Bright, calm interior of the Core & Balance pilates studio in Austin with reformer equipment" class="h-full w-full object-cover" width="800" height="1000" loading="eager" />
+      </div>
+      <div class="rounded-lg border border-line bg-cream p-6 text-sm leading-relaxed">
+        <p class="text-[11px] uppercase tracking-[0.16em] text-muted">The studio</p>
+        <address class="mt-2 not-italic text-ink">
+          2114 South Lamar Blvd, Suite 210<br />Austin, TX 78704
+        </address>
+        <p class="mt-2 text-muted">Mon–Fri 6am–8pm · Sat–Sun 8am–2pm</p>
+        <p class="mt-2"><a href="https://www.google.com/maps/search/?api=1&query=2114+South+Lamar+Blvd+Austin+TX+78704" target="_blank" rel="noopener" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">Open in Google Maps</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="border-t border-line bg-cream">
+    <div class="mx-auto max-w-6xl px-6 py-16 lg:py-20">
+      <h2 class="font-display text-3xl tracking-tight text-ink">The people you'll train with</h2>
+      <div class="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        {team.map((p) => (
+          <a href={`/instructors#${p.slug}`} class="group">
+            <div class="aspect-[6/7] overflow-hidden rounded-lg">
+              <img src={p.image_url} alt={`${p.name}, ${p.role} at Core & Balance Pilates Studio`} class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" width="600" height="700" loading="lazy" />
+            </div>
+            <p class="mt-4 font-display text-lg text-ink group-hover:text-sage">{p.name}</p>
+            <p class="text-sm text-muted">{p.role}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .prose-about :global(p) { margin-bottom: 1.1rem; line-height: 1.75; color: var(--color-ink); }
+  .prose-about :global(h2) { font-family: var(--font-display); font-size: 1.5rem; margin: 2rem 0 0.8rem; color: var(--color-ink); }
+</style>

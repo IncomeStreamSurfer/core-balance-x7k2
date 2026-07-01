@@ -1,0 +1,74 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let testimonials: any[] = [];
+if (sb) {
+  const { data } = await sb
+    .from('testimonials')
+    .select('author_name, author_title, quote, rating, featured')
+    .order('sort_order');
+  testimonials = data ?? [];
+}
+
+const featured = testimonials.find((t) => t.featured) ?? testimonials[0];
+const rest = testimonials.filter((t) => t !== featured);
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Testimonials', item: `${siteUrl}/testimonials` },
+    ],
+  },
+];
+---
+
+<Base
+  title="Member Reviews & Stories | Core & Balance Studio"
+  description="Real stories from Core & Balance members — how pilates in Austin changed their strength, posture, and recovery. Book your first class today."
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-16 pb-12 lg:pt-24">
+    <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">Member stories</p>
+    <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink max-w-2xl">What members say after class</h1>
+    <p class="mt-5 max-w-2xl text-muted leading-relaxed">
+      We don't collect reviews with gift cards or pop-ups — these came in over email, at the front desk, and in the notes field of the booking form. If pilates in Austin is on your list, hear it from the people already on the <a href="/schedule" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">weekly schedule</a>.
+    </p>
+  </section>
+
+  {featured && (
+    <section class="border-y border-line bg-sage text-paper">
+      <div class="mx-auto max-w-4xl px-6 py-16 lg:py-20 text-center">
+        <blockquote class="font-display text-2xl sm:text-3xl leading-snug tracking-tight">“{featured.quote}”</blockquote>
+        <p class="mt-5 text-sm text-paper/80">— {featured.author_name}{featured.author_title ? `, ${featured.author_title}` : ''}</p>
+      </div>
+    </section>
+  )}
+
+  <section class="mx-auto max-w-6xl px-6 py-16 lg:py-20">
+    <div class="columns-1 md:columns-2 gap-6 space-y-6">
+      {rest.map((t) => (
+        <figure class="break-inside-avoid rounded-lg border border-line bg-paper p-7">
+          {t.rating && (
+            <p class="text-sage text-sm tracking-[0.2em]" aria-label={`${t.rating} out of 5 stars`}>{'★'.repeat(t.rating)}</p>
+          )}
+          <blockquote class="mt-3 leading-relaxed text-ink/90">“{t.quote}”</blockquote>
+          <figcaption class="mt-4 text-sm text-muted">— {t.author_name}{t.author_title ? `, ${t.author_title}` : ''}</figcaption>
+        </figure>
+      ))}
+    </div>
+    <div class="mt-14 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-t border-line pt-10">
+      <div>
+        <h2 class="font-display text-2xl sm:text-3xl tracking-tight text-ink">Write the next one</h2>
+        <p class="mt-2 text-muted">Your first class could be this week — see <a href="/classes" class="text-sage underline decoration-line underline-offset-4">class types</a> or <a href="/pricing" class="text-sage underline decoration-line underline-offset-4">pricing</a>.</p>
+      </div>
+      <a href="/book" class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5 shrink-0">Book your first class</a>
+    </div>
+  </section>
+</Base>
