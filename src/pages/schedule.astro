@@ -1,0 +1,123 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let sessions: any[] = [];
+if (sb) {
+  const { data } = await sb
+    .from('class_sessions')
+    .select('id, start_time, end_time, location, capacity, spots_booked, classes(name, slug, level, duration_minutes, price_cents), instructors(name, slug)')
+    .eq('status', 'scheduled')
+    .gte('start_time', new Date().toISOString())
+    .order('start_time')
+    .limit(60);
+  sessions = data ?? [];
+}
+
+// Group sessions by day (America/Chicago)
+const dayKey = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Chicago' });
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+
+const days: Array<{ label: string; items: any[] }> = [];
+for (const s of sessions) {
+  const label = dayKey(s.start_time);
+  const bucket = days.find((d) => d.label === label);
+  if (bucket) bucket.items.push(s);
+  else days.push({ label, items: [s] });
+}
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Schedule', item: `${siteUrl}/schedule` },
+    ],
+  },
+];
+---
+
+<Base
+  title="Pilates Class Schedule Austin | Core & Balance Studio"
+  description="See this week's reformer, mat, prenatal, and barre fusion classes in Austin and book your spot online in under a minute."
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-16 pb-10 lg:pt-24">
+    <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">Schedule</p>
+    <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink">This week at the studio</h1>
+    <p class="mt-5 max-w-2xl text-muted leading-relaxed">
+      Every pilates class below is live-bookable — spots update in real time as members book. Reformer classes cap at six, so grab morning slots early. New to the studio? Read up on our <a href="/classes" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">class types</a> first, or check <a href="/pricing" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">pricing</a>.
+    </p>
+    <div class="mt-6 flex flex-wrap gap-2 text-xs" id="filter-bar">
+      <button data-filter="all" class="filter-btn active rounded-full border border-sage bg-sage px-4 py-1.5 text-paper">All classes</button>
+      <button data-filter="reformer-pilates" class="filter-btn rounded-full border border-line px-4 py-1.5 text-muted hover:border-sage hover:text-sage">Reformer</button>
+      <button data-filter="mat-pilates" class="filter-btn rounded-full border border-line px-4 py-1.5 text-muted hover:border-sage hover:text-sage">Mat</button>
+      <button data-filter="prenatal-pilates" class="filter-btn rounded-full border border-line px-4 py-1.5 text-muted hover:border-sage hover:text-sage">Prenatal</button>
+      <button data-filter="barre-fusion" class="filter-btn rounded-full border border-line px-4 py-1.5 text-muted hover:border-sage hover:text-sage">Barre fusion</button>
+      <button data-filter="private-sessions" class="filter-btn rounded-full border border-line px-4 py-1.5 text-muted hover:border-sage hover:text-sage">Private</button>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-6 pb-20 lg:pb-28">
+    {days.length === 0 && (
+      <div class="rounded-lg border border-line bg-cream p-10 text-center">
+        <p class="font-display text-xl text-ink">New sessions are being scheduled</p>
+        <p class="mt-2 text-sm text-muted">Call us at (512) 555-0184 or <a href="/contact" class="text-sage underline">send a message</a> and we'll save you a spot.</p>
+      </div>
+    )}
+    <div class="space-y-12">
+      {days.map((day) => (
+        <div>
+          <h2 class="font-display text-2xl tracking-tight text-ink border-b border-line pb-3">{day.label}</h2>
+          <div class="divide-y divide-line">
+            {day.items.map((s) => {
+              const left = s.capacity - s.spots_booked;
+              return (
+                <div class="session-row grid gap-3 py-5 sm:grid-cols-[110px_1fr_auto] sm:items-center" data-class={s.classes?.slug}>
+                  <p class="text-sm font-medium text-ink">{fmtTime(s.start_time)}<span class="block text-xs font-normal text-muted">{s.classes?.duration_minutes} min</span></p>
+                  <div>
+                    <p class="font-display text-lg text-ink">
+                      <a href={`/classes/${s.classes?.slug}`} class="hover:text-sage">{s.classes?.name}</a>
+                    </p>
+                    <p class="text-sm text-muted">{s.instructors?.name} · {s.classes?.level} · {s.location}</p>
+                  </div>
+                  <div class="flex items-center gap-4 sm:justify-end">
+                    <p class="text-xs text-muted whitespace-nowrap">{left > 0 ? `${left} spot${left === 1 ? '' : 's'} left` : 'Full'}</p>
+                    {left > 0
+                      ? <a href={`/book?session=${s.id}`} class="rounded-full bg-sage px-5 py-2 text-sm font-medium text-paper hover:bg-sage-dark transition-colors whitespace-nowrap">Book · ${(s.classes?.price_cents / 100).toFixed(0)}</a>
+                      : <span class="rounded-full border border-line px-5 py-2 text-sm text-muted whitespace-nowrap">Waitlist at desk</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <script>
+    const btns = document.querySelectorAll<HTMLButtonElement>('.filter-btn');
+    const rows = document.querySelectorAll<HTMLElement>('.session-row');
+    btns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btns.forEach((b) => {
+          b.classList.remove('active', 'bg-sage', 'text-paper', 'border-sage');
+          b.classList.add('border-line', 'text-muted');
+        });
+        btn.classList.add('active', 'bg-sage', 'text-paper', 'border-sage');
+        btn.classList.remove('border-line', 'text-muted');
+        const f = btn.dataset.filter;
+        rows.forEach((r) => {
+          r.style.display = f === 'all' || r.dataset.class === f ? '' : 'none';
+        });
+      });
+    });
+  </script>
+</Base>

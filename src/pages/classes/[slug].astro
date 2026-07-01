@@ -1,0 +1,164 @@
+---
+import Base from '../../layouts/Base.astro';
+import { anonClient } from '../../lib/supabase';
+import { safeHtml } from '../../lib/sanitize';
+
+const { slug } = Astro.params;
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let cls: any = null;
+let faqs: any[] = [];
+let sessions: any[] = [];
+if (sb && slug) {
+  const { data } = await sb
+    .from('classes')
+    .select('*')
+    .eq('slug', slug)
+    .not('published_at', 'is', null)
+    .maybeSingle();
+  cls = data;
+  if (cls) {
+    const [f, s] = await Promise.all([
+      sb.from('faqs').select('question, answer_html').eq('page_slug', `classes/${slug}`).order('sort_order'),
+      sb.from('class_sessions')
+        .select('id, start_time, capacity, spots_booked, instructors(name, slug)')
+        .eq('class_id', cls.id)
+        .eq('status', 'scheduled')
+        .gte('start_time', new Date().toISOString())
+        .order('start_time')
+        .limit(6),
+    ]);
+    faqs = f.data ?? [];
+    sessions = s.data ?? [];
+  }
+}
+
+if (!cls) return new Response('Not found', { status: 404 });
+
+const fmtDay = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/Chicago' });
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: `${cls.name} in Austin`,
+    description: cls.short_description,
+    provider: { '@type': 'LocalBusiness', name: 'Core & Balance Pilates Studio' },
+    areaServed: { '@type': 'City', name: 'Austin' },
+    offers: { '@type': 'Offer', price: (cls.price_cents / 100).toFixed(2), priceCurrency: 'USD' },
+  },
+  faqs.length > 0 && {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer_html.replace(/<[^>]+>/g, '') },
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Classes', item: `${siteUrl}/classes` },
+      { '@type': 'ListItem', position: 3, name: cls.name, item: `${siteUrl}/classes/${cls.slug}` },
+    ],
+  },
+].filter(Boolean) as object[];
+---
+
+<Base
+  title={cls.meta_title || `${cls.name} | Core & Balance Studio`}
+  description={cls.meta_description || cls.short_description}
+  ogImage={cls.image_url}
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-6xl px-6 pt-14 lg:pt-20">
+    <nav class="text-xs text-muted" aria-label="Breadcrumb">
+      <a href="/" class="hover:text-sage">Home</a> <span class="mx-1">/</span>
+      <a href="/classes" class="hover:text-sage">Classes</a> <span class="mx-1">/</span>
+      <span class="text-ink">{cls.name}</span>
+    </nav>
+    <div class="mt-8 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      <div>
+        <div class="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-sage">
+          <span>{cls.level}</span><span class="text-line">·</span><span>{cls.duration_minutes} minutes</span><span class="text-line">·</span><span>max {cls.capacity} people</span>
+        </div>
+        <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink">{cls.name} classes</h1>
+        <p class="mt-5 max-w-lg text-lg leading-relaxed text-muted">{cls.short_description}</p>
+        <div class="mt-8 flex flex-wrap items-center gap-5">
+          <a href={`/book?class=${cls.slug}`} class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5">Book {cls.name.toLowerCase()} — ${(cls.price_cents / 100).toFixed(0)}</a>
+          <a href="/schedule" class="text-[15px] font-medium text-ink underline decoration-line underline-offset-4 hover:text-sage hover:decoration-sage">See the full schedule</a>
+        </div>
+      </div>
+      <div class="aspect-[10/7] overflow-hidden rounded-lg">
+        <img src={cls.image_url} alt={`${cls.name} class in progress at Core & Balance Pilates Studio, Austin`} class="h-full w-full object-cover" width="1000" height="700" loading="eager" />
+      </div>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-6 py-16 lg:py-20 grid gap-14 lg:grid-cols-[1fr_360px]">
+    <article class="prose-custom max-w-2xl">
+      <div set:html={safeHtml(cls.body_html ?? '')} />
+      <p class="mt-8 text-muted">
+        Curious who teaches it? <a href="/instructors" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">Meet our certified pilates instructors</a>, or compare formats on the <a href="/pricing" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">pricing page</a>.
+      </p>
+    </article>
+
+    <aside class="lg:sticky lg:top-28 h-fit rounded-lg border border-line bg-cream p-6">
+      <h2 class="font-display text-xl text-ink">Upcoming {cls.name.toLowerCase()} sessions</h2>
+      <div class="mt-4 divide-y divide-line">
+        {sessions.length === 0 && <p class="py-3 text-sm text-muted">New sessions are being scheduled — check the <a href="/schedule" class="text-sage underline">full schedule</a>.</p>}
+        {sessions.map((s) => {
+          const left = s.capacity - s.spots_booked;
+          return (
+            <div class="flex items-center justify-between gap-3 py-3">
+              <div>
+                <p class="text-sm font-medium text-ink">{fmtDay(s.start_time)}</p>
+                <p class="text-xs text-muted">{fmtTime(s.start_time)} · {s.instructors?.name}</p>
+              </div>
+              {left > 0
+                ? <a href={`/book?session=${s.id}`} class="rounded-full bg-sage px-4 py-1.5 text-xs font-medium text-paper hover:bg-sage-dark transition-colors">Book</a>
+                : <span class="text-xs text-muted">Full</span>}
+            </div>
+          );
+        })}
+      </div>
+      <a href="/schedule" class="mt-4 inline-block text-sm text-sage underline decoration-line underline-offset-4 hover:decoration-sage">Full weekly schedule →</a>
+    </aside>
+  </section>
+
+  {faqs.length > 0 && (
+    <section class="border-t border-line bg-cream">
+      <div class="mx-auto max-w-3xl px-6 py-16 lg:py-20">
+        <h2 class="font-display text-3xl tracking-tight text-ink">Common questions</h2>
+        <div class="mt-8 divide-y divide-line">
+          {faqs.map((f) => (
+            <details class="group py-5">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-ink">
+                {f.question}
+                <span class="text-sage transition-transform group-open:rotate-45 text-xl leading-none shrink-0">+</span>
+              </summary>
+              <div class="mt-3 text-sm leading-relaxed text-muted [&_p]:mb-2" set:html={safeHtml(f.answer_html)} />
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <section class="mx-auto max-w-6xl px-6 py-16 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+    <h2 class="font-display text-2xl sm:text-3xl tracking-tight text-ink">Ready to try {cls.name.toLowerCase()}?</h2>
+    <a href={`/book?class=${cls.slug}`} class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5 shrink-0">Book your spot</a>
+  </section>
+</Base>
+
+<style>
+  .prose-custom :global(p) { margin-bottom: 1.1rem; line-height: 1.75; color: var(--color-ink); }
+  .prose-custom :global(h2) { font-family: var(--font-display); font-size: 1.6rem; letter-spacing: -0.01em; margin: 2.2rem 0 0.9rem; color: var(--color-ink); }
+</style>
