@@ -1,0 +1,148 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+const preselectSession = Astro.url.searchParams.get('session') ?? '';
+const preselectClass = Astro.url.searchParams.get('class') ?? '';
+
+let sessions: any[] = [];
+if (sb) {
+  const { data } = await sb
+    .from('class_sessions')
+    .select('id, start_time, capacity, spots_booked, classes(name, slug, level, duration_minutes, price_cents), instructors(name)')
+    .eq('status', 'scheduled')
+    .gte('start_time', new Date().toISOString())
+    .order('start_time')
+    .limit(40);
+  sessions = (data ?? []).filter((s: any) => s.capacity - s.spots_booked > 0);
+}
+
+const fmt = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Chicago' }) +
+  ' · ' +
+  new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+
+const renderedAt = Date.now();
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Book a class', item: `${siteUrl}/book` },
+    ],
+  },
+];
+---
+
+<Base
+  title="Book a Pilates Class Online | Core & Balance Studio"
+  description="Book your pilates class online — pick a session, pay securely with Stripe, and your spot is confirmed instantly."
+  structuredData={schemas}
+>
+  <section class="mx-auto max-w-3xl px-6 pt-16 pb-20 lg:pt-24 lg:pb-28">
+    <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">Book online</p>
+    <h1 class="mt-4 font-display text-4xl sm:text-5xl tracking-[-0.02em] leading-[1.02] text-ink">Book a pilates class</h1>
+    <p class="mt-5 text-muted leading-relaxed max-w-xl">
+      Pick a session, tell us who's coming, and pay securely with Stripe. Your spot is confirmed the moment payment completes — you'll get an email receipt with everything you need for your first visit. Prefer to browse first? See the <a href="/schedule" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">full weekly schedule</a> or compare <a href="/classes" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">class types</a>.
+    </p>
+
+    <form id="booking-form" method="POST" action="/api/checkout" class="mt-10 space-y-8">
+      <input type="hidden" name="renderedAt" value={renderedAt} />
+      <input type="text" name="website" aria-hidden="true" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;opacity:0;pointer-events:none" />
+
+      <fieldset>
+        <legend class="font-display text-xl text-ink">1. Choose a session</legend>
+        <div class="mt-4 max-h-[420px] overflow-y-auto rounded-lg border border-line divide-y divide-line" id="session-list">
+          {sessions.length === 0 && <p class="p-6 text-sm text-muted">No bookable sessions right now — <a href="/contact" class="text-sage underline">contact us</a> and we'll fit you in.</p>}
+          {sessions.map((s) => {
+            const left = s.capacity - s.spots_booked;
+            const checked = preselectSession === s.id || (!preselectSession && preselectClass && s.classes?.slug === preselectClass);
+            return (
+              <label class="flex cursor-pointer items-center gap-4 p-4 transition-colors hover:bg-sage-light/60 has-[:checked]:bg-sage-light" data-class={s.classes?.slug}>
+                <input type="radio" name="session_id" value={s.id} checked={checked ? true : undefined} required class="h-4 w-4 accent-[#54634a]" data-max={Math.min(left, 4)} data-price={s.classes?.price_cents} data-name={s.classes?.name} />
+                <span class="flex-1">
+                  <span class="block font-medium text-ink">{s.classes?.name}</span>
+                  <span class="block text-sm text-muted">{fmt(s.start_time)} · {s.instructors?.name} · {left} spot{left === 1 ? '' : 's'} left</span>
+                </span>
+                <span class="font-display text-lg text-ink">${(s.classes?.price_cents / 100).toFixed(0)}</span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      <fieldset class="grid gap-5 sm:grid-cols-2">
+        <legend class="font-display text-xl text-ink mb-4">2. Your details</legend>
+        <div>
+          <label for="name" class="block text-sm font-medium text-ink">Full name</label>
+          <input id="name" type="text" name="name" required minlength="2" class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage" placeholder="Jordan Smith" />
+        </div>
+        <div>
+          <label for="email" class="block text-sm font-medium text-ink">Email</label>
+          <input id="email" type="email" name="email" required class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage" placeholder="you@example.com" />
+        </div>
+        <div>
+          <label for="phone" class="block text-sm font-medium text-ink">Phone <span class="text-muted font-normal">(optional)</span></label>
+          <input id="phone" type="tel" name="phone" class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage" placeholder="(512) 555-0100" />
+        </div>
+        <div>
+          <label for="spots" class="block text-sm font-medium text-ink">Spots</label>
+          <select id="spots" name="spots" class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage">
+            <option value="1">1 person</option>
+            <option value="2">2 people</option>
+            <option value="3">3 people</option>
+            <option value="4">4 people</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label for="notes" class="block text-sm font-medium text-ink">Anything we should know? <span class="text-muted font-normal">(injuries, pregnancy, first visit…)</span></label>
+          <textarea id="notes" name="notes" rows="2" class="mt-1.5 w-full rounded-lg border border-line bg-white px-4 py-2.5 text-sm outline-none focus:border-sage"></textarea>
+        </div>
+      </fieldset>
+
+      <div class="flex flex-wrap items-center gap-5 border-t border-line pt-7">
+        <button type="submit" id="pay-btn" class="inline-flex items-center rounded-full bg-sage px-8 py-4 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0">
+          Continue to secure payment
+        </button>
+        <p class="text-xs text-muted max-w-[240px]">Payment handled by Stripe. Cancel up to 12 hours before class for a full credit.</p>
+      </div>
+      <p id="form-error" class="hidden rounded-lg border border-clay/40 bg-clay/10 px-4 py-3 text-sm text-clay"></p>
+    </form>
+  </section>
+
+  <script>
+    const form = document.getElementById('booking-form') as HTMLFormElement | null;
+    const errBox = document.getElementById('form-error');
+    const payBtn = document.getElementById('pay-btn') as HTMLButtonElement | null;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      errBox?.classList.add('hidden');
+      if (payBtn) { payBtn.disabled = true; payBtn.textContent = 'Redirecting to Stripe…'; }
+      try {
+        const body = Object.fromEntries(new FormData(form).entries());
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.url) throw new Error(json.error ?? 'Something went wrong — please try again.');
+        window.location.href = json.url;
+      } catch (err: any) {
+        if (errBox) { errBox.textContent = err.message; errBox.classList.remove('hidden'); }
+        if (payBtn) { payBtn.disabled = false; payBtn.textContent = 'Continue to secure payment'; }
+      }
+    });
+
+    // Preselected session (via ?session= or ?class=) — scroll it into view
+    const checkedRadio = document.querySelector<HTMLInputElement>('#session-list input[type=radio]:checked');
+    checkedRadio?.closest('label')?.scrollIntoView({ block: 'nearest' });
+  </script>
+</Base>

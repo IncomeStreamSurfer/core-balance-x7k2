@@ -1,0 +1,64 @@
+---
+import Base from '../../layouts/Base.astro';
+import { stripe } from '../../lib/stripe';
+
+const sessionId = Astro.url.searchParams.get('session_id');
+
+let summary: any = null;
+if (sessionId) {
+  try {
+    const s = await stripe().checkout.sessions.retrieve(sessionId);
+    if (s.payment_status === 'paid') {
+      summary = {
+        className: s.metadata?.class_name ?? 'Pilates class',
+        when: s.metadata?.class_when ?? '',
+        instructor: s.metadata?.instructor ?? '',
+        spots: s.metadata?.spots ?? '1',
+        email: s.customer_details?.email ?? '',
+        amount: ((s.amount_total ?? 0) / 100).toFixed(2),
+        currency: (s.currency ?? 'usd').toUpperCase(),
+        ref: s.id.slice(-8).toUpperCase(),
+      };
+    }
+  } catch {
+    summary = null;
+  }
+}
+---
+
+<Base
+  title="Booking Confirmed | Core & Balance Studio"
+  description="Your pilates class booking is confirmed."
+  noindex={true}
+>
+  <section class="mx-auto max-w-2xl px-6 py-20 lg:py-28 text-center">
+    {summary ? (
+      <>
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sage-light">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#54634a" stroke-width="2.4"><path d="M4 12.5l5 5L20 6.5"/></svg>
+        </div>
+        <h1 class="mt-6 font-display text-4xl tracking-tight text-ink">You're booked in</h1>
+        <p class="mt-4 text-muted leading-relaxed">A confirmation email is on its way to <strong class="text-ink">{summary.email}</strong>.</p>
+        <div class="mt-8 rounded-lg border border-line bg-cream p-7 text-left text-sm space-y-2.5">
+          <p class="flex justify-between gap-4"><span class="text-muted">Class</span><span class="font-medium text-ink">{summary.className}</span></p>
+          {summary.when && <p class="flex justify-between gap-4"><span class="text-muted">When</span><span class="font-medium text-ink">{summary.when} (CT)</span></p>}
+          {summary.instructor && <p class="flex justify-between gap-4"><span class="text-muted">Instructor</span><span class="font-medium text-ink">{summary.instructor}</span></p>}
+          <p class="flex justify-between gap-4"><span class="text-muted">Spots</span><span class="font-medium text-ink">{summary.spots}</span></p>
+          <p class="flex justify-between gap-4"><span class="text-muted">Paid</span><span class="font-medium text-ink">{summary.currency} {summary.amount}</span></p>
+          <p class="flex justify-between gap-4 border-t border-line pt-2.5"><span class="text-muted">Reference</span><span class="font-medium text-ink">{summary.ref}</span></p>
+        </div>
+        <p class="mt-6 text-sm text-muted">First visit? Arrive 10 minutes early — we're at 2114 South Lamar Blvd, Suite 210. Grip socks recommended for reformer classes.</p>
+        <div class="mt-8 flex flex-wrap justify-center gap-4">
+          <a href="/schedule" class="inline-flex items-center rounded-full bg-sage px-6 py-3 text-sm font-medium text-paper hover:bg-sage-dark transition-colors">Book another class</a>
+          <a href="/" class="inline-flex items-center rounded-full border border-line px-6 py-3 text-sm font-medium text-ink hover:border-sage hover:text-sage transition-colors">Back to home</a>
+        </div>
+      </>
+    ) : (
+      <>
+        <h1 class="font-display text-4xl tracking-tight text-ink">Hmm, we couldn't find that booking</h1>
+        <p class="mt-4 text-muted leading-relaxed">If you just paid, your confirmation email will arrive shortly. Otherwise, head back to the schedule and try again — or call us at (512) 555-0184.</p>
+        <a href="/schedule" class="mt-8 inline-flex items-center rounded-full bg-sage px-6 py-3 text-sm font-medium text-paper hover:bg-sage-dark transition-colors">Back to the schedule</a>
+      </>
+    )}
+  </section>
+</Base>

@@ -1,0 +1,21 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+
+<Base
+  title="Checkout Cancelled | Core & Balance Studio"
+  description="Your booking wasn't completed — your spot is still available."
+  noindex={true}
+>
+  <section class="mx-auto max-w-2xl px-6 py-20 lg:py-28 text-center">
+    <h1 class="font-display text-4xl tracking-tight text-ink">No charge — nothing booked</h1>
+    <p class="mt-4 text-muted leading-relaxed max-w-md mx-auto">
+      You cancelled before paying, so no spot was reserved and your card wasn't charged. Classes fill up quickly though — especially reformer mornings.
+    </p>
+    <div class="mt-8 flex flex-wrap justify-center gap-4">
+      <a href="/book" class="inline-flex items-center rounded-full bg-sage px-6 py-3 text-sm font-medium text-paper hover:bg-sage-dark transition-colors">Try booking again</a>
+      <a href="/schedule" class="inline-flex items-center rounded-full border border-line px-6 py-3 text-sm font-medium text-ink hover:border-sage hover:text-sage transition-colors">Browse the schedule</a>
+    </div>
+    <p class="mt-8 text-sm text-muted">Questions about a class? <a href="/contact" class="text-sage underline decoration-line underline-offset-4">Send us a message</a> or call (512) 555-0184.</p>
+  </section>
+</Base>
