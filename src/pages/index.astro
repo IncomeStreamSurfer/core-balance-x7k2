@@ -1,0 +1,236 @@
+---
+import Base from '../layouts/Base.astro';
+import { anonClient } from '../lib/supabase';
+
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') || '';
+const sb = anonClient();
+
+let sessions: any[] = [];
+let testimonials: any[] = [];
+let instructors: any[] = [];
+if (sb) {
+  const now = new Date().toISOString();
+  const [s, t, i] = await Promise.all([
+    sb.from('class_sessions')
+      .select('id, start_time, capacity, spots_booked, classes(name, slug, price_cents, duration_minutes), instructors(name)')
+      .eq('status', 'scheduled')
+      .gte('start_time', now)
+      .order('start_time', { ascending: true })
+      .limit(4),
+    sb.from('testimonials').select('author_name, author_title, quote, rating').eq('featured', true).order('sort_order').limit(3),
+    sb.from('instructors').select('slug, name, role, image_url').not('published_at', 'is', null).order('sort_order').limit(4),
+  ]);
+  sessions = s.data ?? [];
+  testimonials = t.data ?? [];
+  instructors = i.data ?? [];
+}
+
+const fmtDay = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Chicago' });
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Core & Balance Pilates Studio',
+    url: siteUrl,
+    logo: `${siteUrl}/favicon.svg`,
+    sameAs: [],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Core & Balance Pilates Studio',
+    url: siteUrl,
+    description: 'Strengthen from the inside out',
+  },
+];
+---
+
+<Base
+  title="Pilates Classes in Austin | Core & Balance Studio"
+  description="Reformer, mat, and prenatal pilates classes in Austin. Book your first class online today with Core & Balance Pilates Studio."
+  structuredData={schemas}
+>
+  <!-- HERO -->
+  <section class="relative overflow-hidden">
+    <div class="mx-auto max-w-6xl px-6 pt-16 pb-20 lg:pt-24 lg:pb-28 grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+      <div>
+        <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">South Lamar · Austin, TX</p>
+        <h1 class="mt-5 font-display text-5xl sm:text-6xl lg:text-[4.2rem] leading-[0.98] tracking-[-0.02em] text-ink">
+          Austin's boutique<br />pilates studio
+        </h1>
+        <p class="mt-6 max-w-md text-lg leading-relaxed text-muted">
+          Strengthen from the inside out. Reformer, mat, and prenatal pilates classes in Austin — capped at twelve people, led by instructors who learn your name and your knees.
+        </p>
+        <div class="mt-9 flex flex-wrap items-center gap-5">
+          <a href="/book" class="inline-flex items-center rounded-full bg-sage px-7 py-3.5 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5">Book your first class</a>
+          <a href="/schedule" class="text-[15px] font-medium text-ink underline decoration-line underline-offset-4 transition-colors hover:text-sage hover:decoration-sage">See this week's schedule</a>
+        </div>
+        <div class="mt-12 flex items-center gap-8 border-t border-line pt-6 text-sm text-muted">
+          <p><span class="font-display text-2xl text-ink">6</span><br />max on reformers</p>
+          <p><span class="font-display text-2xl text-ink">4</span><br />certified instructors</p>
+          <p><span class="font-display text-2xl text-ink">40+</span><br />classes every month</p>
+        </div>
+      </div>
+      <div class="relative">
+        <div class="aspect-[4/5] overflow-hidden rounded-lg">
+          <img
+            src="https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=80"
+            alt="Pilates student stretching on a mat during a class at Core & Balance studio in Austin"
+            class="h-full w-full object-cover"
+            width="800" height="1000"
+            loading="eager"
+          />
+        </div>
+        <div class="absolute -bottom-6 -left-6 hidden sm:block rounded-lg border border-line bg-paper px-6 py-5 shadow-sm max-w-[260px]">
+          <p class="font-display text-lg leading-snug text-ink">“The 6am reformer class rebuilt my back after two years of desk pain.”</p>
+          <p class="mt-2 text-xs text-muted">— Dana R., member since 2024</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLASS TYPES -->
+  <section class="border-t border-line bg-cream">
+    <div class="mx-auto max-w-6xl px-6 py-20 lg:py-28">
+      <div class="flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">What we teach</p>
+          <h2 class="mt-3 font-display text-3xl sm:text-4xl tracking-tight text-ink">Five ways to move, one method</h2>
+        </div>
+        <a href="/classes" class="text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-sage hover:decoration-sage">Explore all pilates classes</a>
+      </div>
+      <div class="mt-12 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
+        {[
+          { href: '/classes/reformer-pilates', name: 'Reformer', desc: 'Spring-loaded resistance, full-body burn. Our signature class.', level: 'All levels' },
+          { href: '/classes/mat-pilates', name: 'Mat', desc: 'The classical foundation — just you, a mat, and gravity.', level: 'Beginner friendly' },
+          { href: '/classes/prenatal-pilates', name: 'Prenatal', desc: 'Safe, supported movement for every trimester.', level: 'Expecting moms' },
+          { href: '/classes/barre-fusion', name: 'Barre fusion', desc: 'Pilates precision meets ballet-barre endurance.', level: 'High energy' },
+          { href: '/classes/private-sessions', name: 'Private', desc: 'One-on-one programming built around your body.', level: 'By appointment' },
+        ].map((c) => (
+          <a href={c.href} class="group bg-paper p-6 transition-all hover:bg-sage-light">
+            <p class="font-display text-xl text-ink group-hover:text-sage-dark">{c.name}</p>
+            <p class="mt-2 text-sm leading-relaxed text-muted">{c.desc}</p>
+            <p class="mt-4 text-[11px] uppercase tracking-[0.16em] text-sage">{c.level}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- UPCOMING SESSIONS -->
+  <section>
+    <div class="mx-auto max-w-6xl px-6 py-20 lg:py-28">
+      <div class="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <div class="lg:sticky lg:top-28">
+          <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">This week</p>
+          <h2 class="mt-3 font-display text-3xl sm:text-4xl tracking-tight text-ink">Next up on the schedule</h2>
+          <p class="mt-4 max-w-sm text-muted leading-relaxed">
+            Every class is bookable online in under a minute — pick a time, pay securely with Stripe, and your spot is held. See the <a href="/schedule" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">full class schedule</a> or check <a href="/pricing" class="text-sage underline decoration-line underline-offset-4 hover:decoration-sage">pricing and packs</a>.
+          </p>
+          <a href="/schedule" class="mt-7 inline-flex items-center rounded-full border border-sage px-6 py-3 text-sm font-medium text-sage transition-colors hover:bg-sage hover:text-paper">Browse the full schedule</a>
+        </div>
+        <div class="divide-y divide-line rounded-lg border border-line bg-paper">
+          {sessions.length === 0 && (
+            <p class="p-8 text-muted text-sm">New sessions are being added — check the <a href="/schedule" class="text-sage underline">schedule page</a>.</p>
+          )}
+          {sessions.map((s) => {
+            const spotsLeft = s.capacity - s.spots_booked;
+            return (
+              <div class="flex flex-wrap items-center justify-between gap-4 p-5 transition-colors hover:bg-sage-light/50">
+                <div>
+                  <p class="font-display text-lg text-ink">{s.classes?.name}</p>
+                  <p class="mt-0.5 text-sm text-muted">{fmtDay(s.start_time)} · {fmtTime(s.start_time)} · {s.instructors?.name}</p>
+                </div>
+                <div class="flex items-center gap-4">
+                  <p class="text-xs text-muted">{spotsLeft > 0 ? `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} left` : 'Full'}</p>
+                  {spotsLeft > 0
+                    ? <a href={`/book?session=${s.id}`} class="rounded-full bg-sage px-5 py-2 text-sm font-medium text-paper hover:bg-sage-dark transition-colors">Book · ${(s.classes?.price_cents / 100).toFixed(0)}</a>
+                    : <span class="rounded-full border border-line px-5 py-2 text-sm text-muted">Waitlist at desk</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STORY -->
+  <section class="border-t border-line bg-sage text-paper">
+    <div class="mx-auto max-w-6xl px-6 py-20 lg:py-28 grid gap-12 lg:grid-cols-2 lg:items-center">
+      <div class="aspect-[5/4] overflow-hidden rounded-lg order-last lg:order-first">
+        <img
+          src="https://images.unsplash.com/photo-1552196563-55cd4e45efb3?auto=format&fit=crop&w=1200&q=80"
+          alt="Small group pilates class working on mats inside the Core & Balance Austin studio"
+          class="h-full w-full object-cover"
+          width="1000" height="800"
+          loading="lazy"
+        />
+      </div>
+      <div>
+        <p class="text-[11px] uppercase tracking-[0.22em] text-paper/70 font-medium">Why we started this</p>
+        <h2 class="mt-3 font-display text-3xl sm:text-4xl tracking-tight">Small classes aren't a perk. They're the method.</h2>
+        <p class="mt-6 leading-relaxed text-paper/85 max-w-lg">
+          Pilates works when someone is watching your form — really watching. That's why our reformer classes cap at six and mat classes at twelve, why every instructor holds a comprehensive certification, and why your first visit starts with a two-minute chat about your body, not a waiver on a clipboard.
+        </p>
+        <p class="mt-4 leading-relaxed text-paper/85 max-w-lg">
+          Since opening on South Lamar, we've helped runners fix their hips, new moms rebuild their core, and desk workers stand up straight again.
+        </p>
+        <a href="/about" class="mt-8 inline-flex items-center rounded-full border border-paper/40 px-6 py-3 text-sm font-medium transition-colors hover:bg-paper hover:text-sage">Read our story</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTRUCTORS -->
+  <section>
+    <div class="mx-auto max-w-6xl px-6 py-20 lg:py-28">
+      <div class="flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">The team</p>
+          <h2 class="mt-3 font-display text-3xl sm:text-4xl tracking-tight text-ink">Instructors who coach, not count reps</h2>
+        </div>
+        <a href="/instructors" class="text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-sage hover:decoration-sage">Meet all our pilates instructors</a>
+      </div>
+      <div class="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        {instructors.map((p) => (
+          <a href={`/instructors#${p.slug}`} class="group">
+            <div class="aspect-[6/7] overflow-hidden rounded-lg">
+              <img src={p.image_url} alt={`${p.name}, ${p.role} at Core & Balance Pilates Studio in Austin`} class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" width="600" height="700" loading="lazy" />
+            </div>
+            <p class="mt-4 font-display text-lg text-ink group-hover:text-sage">{p.name}</p>
+            <p class="text-sm text-muted">{p.role}</p>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIAL PULL QUOTE -->
+  {testimonials.length > 0 && (
+    <section class="border-t border-line bg-cream">
+      <div class="mx-auto max-w-4xl px-6 py-20 lg:py-28 text-center">
+        <p class="text-[11px] uppercase tracking-[0.22em] text-sage font-medium">From our members</p>
+        <blockquote class="mt-6 font-display text-2xl sm:text-3xl leading-snug tracking-tight text-ink">
+          “{testimonials[0].quote}”
+        </blockquote>
+        <p class="mt-5 text-sm text-muted">— {testimonials[0].author_name}{testimonials[0].author_title ? `, ${testimonials[0].author_title}` : ''}</p>
+        <a href="/testimonials" class="mt-8 inline-block text-sm font-medium text-ink underline decoration-line underline-offset-4 hover:text-sage hover:decoration-sage">Read more member stories</a>
+      </div>
+    </section>
+  )}
+
+  <!-- CTA -->
+  <section class="border-t border-line">
+    <div class="mx-auto max-w-6xl px-6 py-20 lg:py-24 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+      <div>
+        <h2 class="font-display text-3xl sm:text-4xl tracking-tight text-ink">Your first class is the hardest part.<br />We'll take it from there.</h2>
+        <p class="mt-4 max-w-lg text-muted leading-relaxed">No memberships required to start — book a single reformer, mat, prenatal, or barre fusion class online and see how it feels.</p>
+      </div>
+      <a href="/book" class="inline-flex items-center rounded-full bg-sage px-8 py-4 text-[15px] font-medium text-paper transition-all hover:bg-sage-dark hover:-translate-y-0.5 shrink-0">Book a class online</a>
+    </div>
+  </section>
+</Base>
